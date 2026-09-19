@@ -1,46 +1,42 @@
-provider "yandex" {
-  folder_id = var.folder_id
-}
-
 resource "yandex_vpc_network" "default" {
-  name        = "default"
+  name        = var.network_name
   description = "Auto-created network"
 }
 
 resource "yandex_vpc_subnet" "default_a" {
-  name           = "default-ru-central1-a"
+  name           = var.subnet_a_name
   description    = "Auto-created default subnet for zone ru-central1-a in default"
   zone           = "ru-central1-a"
   network_id     = yandex_vpc_network.default.id
-  v4_cidr_blocks = ["10.128.0.0/24"]
+  v4_cidr_blocks = [var.subnet_a_cidr]
 }
 
 resource "yandex_vpc_subnet" "default_b" {
-  name           = "default-ru-central1-b"
+  name           = var.subnet_b_name
   description    = "Auto-created default subnet for zone ru-central1-b in default"
   zone           = "ru-central1-b"
   network_id     = yandex_vpc_network.default.id
-  v4_cidr_blocks = ["10.129.0.0/24"]
+  v4_cidr_blocks = [var.subnet_b_cidr]
 }
 
 resource "yandex_vpc_subnet" "default_d" {
-  name           = "default-ru-central1-d"
+  name           = var.subnet_d_name
   description    = "Auto-created default subnet for zone ru-central1-d in default"
   zone           = "ru-central1-d"
   network_id     = yandex_vpc_network.default.id
-  v4_cidr_blocks = ["10.130.0.0/24"]
+  v4_cidr_blocks = [var.subnet_d_cidr]
 }
 
 resource "yandex_vpc_subnet" "default_e" {
-  name           = "default-ru-central1-e"
+  name           = var.subnet_e_name
   description    = "Auto-created default subnet for zone ru-central1-e in default"
   zone           = "ru-central1-e"
   network_id     = yandex_vpc_network.default.id
-  v4_cidr_blocks = ["10.131.0.0/24"]
+  v4_cidr_blocks = [var.subnet_e_cidr]
 }
 
 resource "yandex_compute_disk" "compute_vm_boot" {
-  name     = "disk-ubuntu-24-04-lts-1778770257546"
+  name     = var.boot_disk_name
   type     = "network-ssd"
   zone     = "ru-central1-b"
   size     = 40
@@ -48,7 +44,7 @@ resource "yandex_compute_disk" "compute_vm_boot" {
 }
 
 resource "yandex_compute_instance" "compute_vm" {
-  name        = "compute-vm"
+  name        = var.vm_name
   description = "пока что используется для поднятия раннеров"
 
   zone        = "ru-central1-b"
@@ -69,14 +65,15 @@ resource "yandex_compute_instance" "compute_vm" {
   }
 
   network_interface {
-    subnet_id = yandex_vpc_subnet.default_b.id
-    ip_address = "10.129.0.16"
-    nat = true
+    subnet_id  = yandex_vpc_subnet.default_b.id
+    ip_address = var.vm_ip
+    nat        = true
+
     security_group_ids = [
       yandex_vpc_security_group.default.id
     ]
   }
-  
+
   lifecycle {
     ignore_changes = [
       metadata
@@ -85,7 +82,7 @@ resource "yandex_compute_instance" "compute_vm" {
 }
 
 resource "yandex_vpc_security_group" "default" {
-  name        = "default-sg-enpii3i3t1ln2t0i8c5k"
+  name        = var.security_group_name
   description = "Default security group for network"
   network_id  = yandex_vpc_network.default.id
 
@@ -105,7 +102,7 @@ resource "yandex_iam_service_account" "devopsotus" {
 }
 
 resource "yandex_dns_zone" "internal" {
-  name             = "auto-enpii3i3t1ln2t0i8c5k-internal_"
+  name             = var.internal_dns_zone_name
   description      = "Automatically created DNS zone \"internal.\" for network (enpii3i3t1ln2t0i8c5k)"
   zone             = "internal."
   private_networks = [yandex_vpc_network.default.id]
@@ -113,10 +110,10 @@ resource "yandex_dns_zone" "internal" {
 
 resource "yandex_dns_recordset" "compute_vm" {
   zone_id = yandex_dns_zone.internal.id
-  name    = "compute-vm.ru-central1.internal."
+  name    = var.vm_dns_name
   type    = "A"
   ttl     = 600
-  data    = ["10.129.0.16"]
+  data    = [var.vm_ip]
 }
 
 resource "yandex_dns_recordset" "ns_internal" {
@@ -124,16 +121,11 @@ resource "yandex_dns_recordset" "ns_internal" {
   name    = "ns.internal."
   type    = "A"
   ttl     = 600
-  data = [
-    "10.129.0.2",
-    "10.128.0.2",
-    "10.130.0.2",
-    "10.131.0.2"
-  ]
+  data    = var.dns_nameserver_ips
 }
 
 resource "yandex_dns_zone" "reverse" {
-  name             = "auto-enpii3i3t1ln2t0i8c5k-10_in-addr_arpa_"
+  name             = var.reverse_dns_zone_name
   description      = "Automatically created DNS zone \"10.in-addr.arpa.\" for network (enpii3i3t1ln2t0i8c5k)"
   zone             = "10.in-addr.arpa."
   private_networks = [yandex_vpc_network.default.id]
@@ -141,14 +133,14 @@ resource "yandex_dns_zone" "reverse" {
 
 resource "yandex_dns_recordset" "compute_vm_ptr" {
   zone_id = yandex_dns_zone.reverse.id
-  name    = "16.0.129.10.in-addr.arpa."
+  name    = var.vm_ptr_name
   type    = "PTR"
   ttl     = 600
-  data    = ["compute-vm.ru-central1.internal."]
+  data    = [var.vm_dns_name]
 }
 
 resource "yandex_logging_group" "default" {
-  name             = "default"
+  name             = var.logging_group_name
   description      = "Auto-created default group"
   retention_period = "72h"
 }
@@ -166,18 +158,5 @@ resource "yandex_kms_symmetric_key" "key_1787321464166" {
 resource "yandex_kms_symmetric_key" "key_1780806086183" {
   name              = "key-1780806086183"
   default_algorithm = "AES_256"
-}
-
-resource "yandex_gitlab_instance" "otus" {
-  name                       = "otus-gitlab"
-  resource_preset_id         = "s2.micro"
-  disk_size                  = 30
-  subnet_id                  = yandex_vpc_subnet.default_b.id
-  backup_retain_period_days  = 7
-  approval_rules_id          = "NONE"
-
-  domain      = "vasyukov-157.gitlab.yandexcloud.net"
-  admin_login = "addons4d"
-  admin_email = "addons4d@yandex.ru"
 }
 

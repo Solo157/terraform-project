@@ -1,5 +1,6 @@
 .terraform/
 .idea/
-terraform.tfvars
+env/staging/terraform.tfvars
+env/prod/terraform.tfvars
 *.tfstate.backup
 *.tfstate.*.backup
