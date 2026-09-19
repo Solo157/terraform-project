@@ -1,42 +1,101 @@
-# Terraform в Yandex Cloud
+# Terraform project
 
-Инфраструктура Yandex Cloud импортирована и описана с помощью Terraform.
+Terraform-конфигурация для управления инфраструктурой в Yandex Cloud с использованием нескольких окружений.
 
-## Ресурсы, которые описаны в Terraform
+## Компоненты инфраструктуры
 
-* VPC: сеть и 4 подсети
-* Compute Cloud: VM и загрузочный диск
-* Security Group
-* DNS: 2 приватные зоны и записи
-* IAM: Service Account
-* KMS: 3 симметричных ключа
-* Cloud Logging: Log Group
-* Managed GitLab
+Модуль `modules/infrastructure` содержит основные ресурсы:
 
-## Проверка
+* VPC Network и подсети;
+* виртуальную машину и загрузочный диск;
+* Security Group;
+* IAM Service Account;
+* DNS и Reverse DNS;
+* Logging Group;
+* KMS keys.
 
-1. Инициализация: terraform init
-2. Провалидировать сущности terraform: terraform validate
-3. Просмотреть план: terraform plan
+Модуль `modules/gitlab` содержит Yandex GitLab Instance.
 
-Terraform state хранится в `terraform.tfstate`.
-state:
-yandex_compute_disk.compute_vm_boot
-yandex_compute_instance.compute_vm
-yandex_dns_recordset.compute_vm
-yandex_dns_recordset.compute_vm_ptr
-yandex_dns_recordset.ns_internal
-yandex_dns_zone.internal
-yandex_dns_zone.reverse
-yandex_gitlab_instance.otus
-yandex_iam_service_account.devopsotus
-yandex_kms_symmetric_key.key_1780806086183
-yandex_kms_symmetric_key.key_1787321276432
-yandex_kms_symmetric_key.key_1787321464166
-yandex_logging_group.default
-yandex_vpc_network.default
-yandex_vpc_security_group.default
-yandex_vpc_subnet.default_a
-yandex_vpc_subnet.default_b
-yandex_vpc_subnet.default_d
-yandex_vpc_subnet.default_e
+## Окружения 
+
+В проекте используются два окружения: 
+
+### Staging
+
+Находится в `env/staging`.
+
+Использует существующую учебную инфраструктуру и отдельный Terraform State:
+
+```text
+env/staging/terraform.tfstate
+```
+
+Также в staging подключён модуль `gitlab`.
+
+### Prod
+
+Находится в `env/prod`.
+
+Использует те же Terraform-модули, но с другими параметрами ресурсов и отдельным окружением.
+
+Параметры задаются в:
+
+```text
+env/prod/terraform.tfvars
+```
+
+Prod не использует модуль GitLab.
+
+## Связь окружений с кодом
+
+Общая инфраструктура описана один раз в модуле:
+
+```text
+modules/infrastructure
+```
+
+Каждое окружение подключает этот модуль:
+
+```hcl
+module "infrastructure" {
+  source = "../../modules/infrastructure"
+}
+```
+
+Конкретные параметры окружения задаются через `terraform.tfvars`.
+
+Различия между `staging` и `prod` задаются переменными.
+
+Каждое окружение имеет собственный Terraform State, поэтому ресурсы окружений управляются независимо.
+
+## Запуск
+
+### Staging
+
+```bash
+cd env/staging
+terraform init
+terraform plan
+terraform apply
+```
+
+### Prod
+
+```bash
+cd env/prod
+terraform init
+terraform plan
+terraform apply
+```
+
+Для проверки состояния после применения:
+
+```bash
+terraform plan
+```
+
+Для удаления инфраструктуры:
+
+```bash
+terraform destroy
+```
